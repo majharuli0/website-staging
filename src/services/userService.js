@@ -63,14 +63,14 @@ export const useUserService = () => {
       });
 
       // Check if Stripe customer creation was successful
-      if (!stripeCustomerResponse || !stripeCustomerResponse.id) {
+      if (!stripeCustomerResponse?.data || !stripeCustomerResponse?.data?.id) {
         throw new Error("Failed to create Stripe customer.");
       }
 
       // Combine user data with Stripe customer ID
       const combinedUserData = {
         ...userResponse,
-        stripeCustomerId: stripeCustomerResponse.id,
+        stripeCustomerId: stripeCustomerResponse?.data?.id,
       };
 
       // Store only the Stripe customer ID in a cookie
@@ -130,7 +130,8 @@ export const useUserService = () => {
   };
 
   const getProducts = async () => {
-    return get("orders/get-products");
+    // return get("orders/get-products"); //old one
+    return get("/stripe/stripe-products"); // new one
   };
   const getCountries = async () => {
     return get("/countries");
@@ -140,11 +141,13 @@ export const useUserService = () => {
     return get("/users/agents");
   };
   const createStripeCustomer = async (userData) => {
-    return post("/orders/create-stripe-customer", userData);
+    // return post("/orders/create-stripe-customer", userData); //old one
+    return post("/stripe/create-stripe-customer", userData); // new one
   };
 
   const createStripeSession = async (sessionData) => {
-    return post("/orders/create-session", sessionData);
+    // return post("/orders/create-session", sessionData); // old one
+    return post("/stripe/create-customer-session", sessionData); // new one
   };
   const renewSubscription = async (data) => {
     return post("/orders/renew-subscription", data);
@@ -181,7 +184,8 @@ export const useUserService = () => {
   };
 
   const getSessionDetails = async (sessionId) => {
-    return get(`/orders/session-details/${sessionId}`);
+    // return get(`/orders/session-details/${sessionId}`);
+    return get(`/stripe/session-details/${sessionId}`);
   };
   const getFirstOrderStatus = async (sessionId) => {
     return get(`/orders/first-order`);
@@ -189,10 +193,12 @@ export const useUserService = () => {
 
   //Nessesary API's For Make Subscription Stuff
   const handlePaymentStatus = async (sessionId) => {
-    return post(`/orders/handle-payment-success`, { session_id: sessionId });
+    // return post(`/orders/handle-payment-success`, { session_id: sessionId });
+    return post(`/stripe/handle-payment-success`, { session_id: sessionId });
   };
   const cancelSubscription = async (subs_id) => {
-    return post(`/orders/cancel-subscription`, { subscriptionId: subs_id });
+    // return post(`/orders/cancel-subscription`, { subscriptionId: subs_id });
+    return post(`/stripe/cancel-subscription`, { subscriptionId: subs_id });
   };
   const handlePaymentSubscription = async (
     customerId,
@@ -200,7 +206,8 @@ export const useUserService = () => {
     email,
     password
   ) => {
-    return post(`/orders/create-subscription`, {
+    // return post(`/orders/create-subscription`, {
+    return post(`/stripe/create-subscription`, {
       customerId: customerId,
       priceId: priceId,
       email: email,
@@ -208,7 +215,8 @@ export const useUserService = () => {
     });
   };
   const subscriptionDetails = async (subscriptionId) => {
-    return get(`/orders/subscription-status/${subscriptionId}`);
+    // return get(`/orders/subscription-status/${subscriptionId}`);
+    return get(`/stripe/subscription-status/${subscriptionId}`);
   };
   //=====End========//
 
@@ -280,7 +288,8 @@ export const useUserService = () => {
 
   const getTransactionDetails = async (customerId) => {
     try {
-      const response = await get(`/orders/transaction-details/${customerId}`);
+      // const response = await get(`/orders/transaction-details/${customerId}`);
+      const response = await get(`/stripe/transaction-details/${customerId}`);
       return response; // Return the transaction details
     } catch (error) {
       console.error("Error fetching transaction details:", error);
@@ -298,7 +307,8 @@ export const useUserService = () => {
   };
   const getCustomerId = async (customeremail) => {
     try {
-      const response = await get(`/orders/customer-email/${customeremail}`);
+      // const response = await get(`/orders/customer-email/${customeremail}`);
+      const response = await get(`/stripe/customer-email/${customeremail}`);
       return response; // Return the transaction details
     } catch (error) {
       console.error("Error fetching transaction details:", error);

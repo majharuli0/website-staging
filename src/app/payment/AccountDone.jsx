@@ -16,22 +16,23 @@ export default function AccountDone() {
   const { country } = useAuth();
   const expectedCurrency = country === "global" ? "usd" : "aud";
 
-  const orderDetails = JSON.parse(localStorage.getItem("orderDetails"));
-  const isUserVerified =
-    JSON.parse(localStorage.getItem("isUserVerified")) || false;
-  if (!orderDetails || !isUserVerified) {
-    router.push("/");
-    return;
-  }
+
+  // const isUserVerified =
+  //   JSON.parse(localStorage.getItem("isUserVerified")) || false;
+  // if (!orderDetails || !isUserVerified) {
+  //   router.push("/");
+  //   return;
+  // }
   const processPayment = async () => {
     const stripeCustomerId = await getStripeCustomerId();
-
-    if (!stripeCustomerId) {
-      router.push("/sign-up");
-      return;
-    }
-    setIsProcessing(true);
-    try {
+  const orderDetails = JSON.parse(localStorage.getItem("orderDetails"));
+  if (!stripeCustomerId) {
+    router.push("/sign-up");
+    return;
+  }
+  setIsProcessing(true);
+  try {
+      const user_credentials = JSON.parse(localStorage.getItem("user_credentials"));
       // const lineItems = [
       //   {
       //     price: orderDetails.products[3].priceId, // kit
@@ -61,6 +62,7 @@ export default function AccountDone() {
       //     adjustable_quantity: { enabled: false },
       //   });
       // }
+      let returnURL = window.location.origin;
       let successUrl = window.location.origin + "/success";
       let cancelUrl = window.location.origin + "/cancel";
       const lineItems = orderDetails.products
@@ -92,8 +94,11 @@ export default function AccountDone() {
       const session = await createStripeSession({
         customer: stripeCustomerId,
         line_items: lineItems,
-        success_url: successUrl,
-        cancel_url: cancelUrl,
+        return_url: returnURL,
+        sessionMode: "payment",
+        email: user_credentials?.email 
+        // success_url: successUrl,
+        // cancel_url: cancelUrl,
       });
 
       // Redirect to Stripe Checkout

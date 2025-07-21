@@ -180,6 +180,7 @@ export default function HomePage() {
     let stripeCustomerId;
     // Attempt to get the Stripe customer ID
     const email = localStorage.getItem("user_email");
+    const user_credentials = localStorage.getItem("user_credentials");
     try {
       stripeCustomerId = await getStripeCustomerId(email);
       if (!stripeCustomerId) {
@@ -251,6 +252,7 @@ export default function HomePage() {
         line_items: lineItems,
         success_url: successUrl,
         cancel_url: cancelUrl,
+        email: user_credentials?.email
       });
 
       window.location.href = session.url;

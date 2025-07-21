@@ -23,146 +23,208 @@ function Page() {
   if (typeof window !== "undefined") {
     sessionId = new URLSearchParams(window.location.search).get("session_id");
   }
-  const [isUserVerified, setIsUserVerified] = useState(null);
-  const handleOrder = async (orderData) => {
-    const agent_details = localStorage.getItem("agent_details");
-    const installation_details = localStorage.getItem("installation_details");
-    const user_credentials = localStorage.getItem("user_credentials");
-    const addressPharsed = JSON.parse(installation_details);
-    const address = localStorage.getItem("user_add");
-    const existingUserAddressPharsed = JSON.parse(address);
 
-    const order = {
-      total: orderData.amount_total / 100,
-      grand_total: orderData.amount_total / 100,
-      is_paid: orderData.payment_status === "paid",
-      payment_status: "pending",
-      payment_method: orderData.payment_method_types[0],
-      transaction_id: orderData.payment_intent,
-      customer: orderData.customer,
-      agent_unique_id: JSON.parse(agent_details).agent_id,
-      installation_date: addressPharsed?.installation_date || "",
-      email: JSON.parse(user_credentials).email,
-      currency: expectedCurrency === "aud" ? "AU$" : "$",
-      password: JSON.parse(user_credentials).password,
-      products: orderData.line_items.map((item) => ({
-        id: item.productId,
-        name: item.productName,
-        type:
-          item.productName === "Required with your system"
-            ? "Seenyor Kit"
-            : item.productName === "Installation"
-            ? "Installation"
-            : item.productName === "AI Monitoring"
-            ? "AI Monitoring"
-            : item.productName === "All in One AI Sensor"
-            ? `AI Sensor ${item.quantity}x`
-            : "package",
-        price: item.price,
-        quantity: item.quantity,
-        priceId: item.productId,
-      })),
-      total_details: {
-        amount_discount: orderData.total_details.amount_discount,
-        amount_shipping: orderData.total_details.amount_shipping,
-        amount_tax: orderData.total_details.amount_tax,
-      },
-      address: {
-        city: addressPharsed?.city || existingUserAddressPharsed.city || "",
-        country: orderData?.customer_details?.address?.country || "",
-        line1:
-          addressPharsed?.address || existingUserAddressPharsed?.address || "",
-        line2:
-          addressPharsed?.address2 ||
-          existingUserAddressPharsed?.address2 ||
-          "",
-        postal_code:
-          addressPharsed?.postal_code ||
-          existingUserAddressPharsed.post_Code ||
-          "",
-        state: addressPharsed?.state || existingUserAddressPharsed.state || "",
-      },
-    };
-    try {
-      const response = await createOrder(order);
-      console.log("Order created successfully:", response);
-      // Clear the orderDetails from localStorage
-      localStorage.removeItem("orderDetails");
-      // Optionally, redirect to an order confirmation page
-      // router.push("/");
-    } catch (error) {
-      console.error("Error creating order:", error);
-    }
-  };
-  const hasRunRef = useRef(false); // Use useRef to persist the flag across renders
   useEffect(() => {
-    const devices = JSON.parse(localStorage.getItem("devices"));
-    const user_credentials = localStorage.getItem("user_credentials");
+    const processPayment = async () => {
+      if (typeof window === "undefined") return;
 
-    const verified = JSON.parse(localStorage.getItem("isUserVerified"));
-    if (typeof window !== "undefined") {
+      const devices = JSON.parse(localStorage.getItem("devices") || "[]");
+      const user_credentials = JSON.parse(localStorage.getItem("user_credentials") || "{}");
+      const verified = JSON.parse(localStorage.getItem("isUserVerified") || "false");
+ 
+
       if (!verified) {
         router.push("/");
+        return;
       }
-    }
-    console.log("================>");
 
-    if (sessionId && !hasRunRef.current) {
-      hasRunRef.current = true;
-      let customerId;
-      if (devices && verified) {
-        const chnageStatus = chnageDeviceStatus({
-          uids: devices.map((deviceId) => deviceId),
-          email: JSON.parse(user_credentials).email,
-          is_active: true,
-        });
+      try {
+        if (devices && devices.length > 0) {
+          await chnageDeviceStatus({
+            uids: devices,
+            email: user_credentials.email,
+            is_active: true,
+          });
+        }
+
+        const session = await getSessionDetails(sessionId);
+        const customerId = session?.customer;
+
+        const subscriptionProducts = JSON.parse(
+          localStorage.getItem("subscriptionProducts") || "[]"
+        );
+
+        if (subscriptionProducts.length > 0) {
+          await handlePaymentSubscription(
+            customerId,
+            subscriptionProducts[0].priceId,
+            user_credentials.email,
+            user_credentials.password
+          );
+        }
+
+        // Optional: clean up localStorage
+        [
+          "devices",
+          "subscriptionProducts",
+          "orderDetails",
+          "installation_details",
+          "user_credentials",
+          "agent_details",
+          "isUserVerified",
+          "subscription_id"
+        ].forEach((item) => localStorage.removeItem(item));
+
+      } catch (err) {
+        console.error("Error in payment process:", err);
+        setError("Something went wrong! Please Contact with Support");
+      } finally {
+        setIsProcessing(false);
       }
-      getSessionDetails(sessionId)
-        .then((session) => {
-          customerId = session.customer;
-          return handleOrder(session);
-        })
-        .then(() => handlePaymentStatus(sessionId))
-        .then((response) => {
-          if (response.success) {
-            const subscriptionProducts = JSON.parse(
-              localStorage.getItem("subscriptionProducts")
-            );
-            const user_credentials = localStorage.getItem("user_credentials");
-            if (subscriptionProducts && subscriptionProducts.length > 0) {
-              return handlePaymentSubscription(
-                customerId,
-                subscriptionProducts[0].priceId,
-                JSON.parse(user_credentials).email,
-                JSON.parse(user_credentials).password
-              );
-            }
-          } else {
-            console.log("Payment Status False");
-          }
-        })
-        .then((response) => {
-          if (response) console.log(response);
+    };
 
-          setIsProcessing(false);
-          // Clear localStorage
-          [
-            "devices",
-            "subscriptionProducts",
-            "orderDetails",
-            "installation_details",
-            "user_credentials",
-            "agent_details",
-            "isUserVerified",
-          ].forEach((item) => localStorage.removeItem(item));
-        })
-        .catch((error) => {
-          setError("Something went wrong! Please Contact with Support");
-          setIsProcessing(false);
-          console.error("Error in payment process:", error);
-        });
-    }
+    processPayment();
   }, [sessionId]);
+
+  // const handleOrder = async (orderData) => {
+  //   const agent_details = localStorage.getItem("agent_details");
+  //   const installation_details = localStorage.getItem("installation_details");
+  //   const user_credentials = localStorage.getItem("user_credentials");
+  //   const addressPharsed = JSON.parse(installation_details);
+  //   const address = localStorage.getItem("user_add");
+  //   const existingUserAddressPharsed = JSON.parse(address);
+
+  //   const order = {
+  //     total: orderData.amount_total / 100,
+  //     grand_total: orderData.amount_total / 100,
+  //     is_paid: orderData.payment_status === "paid",
+  //     payment_status: "pending",
+  //     payment_method: orderData.payment_method_types[0],
+  //     transaction_id: orderData.payment_intent,
+  //     customer: orderData.customer,
+  //     agent_unique_id: JSON.parse(agent_details).agent_id,
+  //     installation_date: addressPharsed?.installation_date || "",
+  //     email: JSON.parse(user_credentials).email,
+  //     currency: expectedCurrency === "aud" ? "AU$" : "$",
+  //     password: JSON.parse(user_credentials).password,
+  //     products: orderData.line_items.map((item) => ({
+  //       id: item.productId,
+  //       name: item.productName,
+  //       type:
+  //         item.productName === "Required with your system"
+  //           ? "Seenyor Kit"
+  //           : item.productName === "Installation"
+  //           ? "Installation"
+  //           : item.productName === "AI Monitoring"
+  //           ? "AI Monitoring"
+  //           : item.productName === "All in One AI Sensor"
+  //           ? `AI Sensor ${item.quantity}x`
+  //           : "package",
+  //       price: item.price,
+  //       quantity: item.quantity,
+  //       priceId: item.productId,
+  //     })),
+  //     total_details: {
+  //       amount_discount: orderData.total_details.amount_discount,
+  //       amount_shipping: orderData.total_details.amount_shipping,
+  //       amount_tax: orderData.total_details.amount_tax,
+  //     },
+  //     address: {
+  //       city: addressPharsed?.city || existingUserAddressPharsed.city || "",
+  //       country: orderData?.customer_details?.address?.country || "",
+  //       line1:
+  //         addressPharsed?.address || existingUserAddressPharsed?.address || "",
+  //       line2:
+  //         addressPharsed?.address2 ||
+  //         existingUserAddressPharsed?.address2 ||
+  //         "",
+  //       postal_code:
+  //         addressPharsed?.postal_code ||
+  //         existingUserAddressPharsed.post_Code ||
+  //         "",
+  //       state: addressPharsed?.state || existingUserAddressPharsed.state || "",
+  //     },
+  //   };
+  //   try {
+  //     const response = await createOrder(order);
+  //     console.log("Order created successfully:", response);
+  //     // Clear the orderDetails from localStorage
+  //     localStorage.removeItem("orderDetails");
+  //     // Optionally, redirect to an order confirmation page
+  //     // router.push("/");
+  //   } catch (error) {
+  //     console.error("Error creating order:", error);
+  //   }
+  // };
+  // const hasRunRef = useRef(false); // Use useRef to persist the flag across renders
+  // useEffect(() => {
+  //   const devices = JSON.parse(localStorage.getItem("devices"));
+  //   const user_credentials = localStorage.getItem("user_credentials");
+
+  //   const verified = JSON.parse(localStorage.getItem("isUserVerified"));
+  //   if (typeof window !== "undefined") {
+  //     if (!verified) {
+  //       router.push("/");
+  //     }
+  //   }
+  //   console.log("================>");
+
+  //   if (sessionId && !hasRunRef.current) {
+  //     hasRunRef.current = true;
+  //     let customerId;
+  //     if (devices && verified) {
+  //       const chnageStatus = chnageDeviceStatus({
+  //         uids: devices.map((deviceId) => deviceId),
+  //         email: JSON.parse(user_credentials).email,
+  //         is_active: true,
+  //       });
+  //     }
+  //     getSessionDetails(sessionId)
+  //       .then((session) => {
+  //         customerId = session.customer;
+  //         return handleOrder(session);
+  //       })
+  //       .then(() => handlePaymentStatus(sessionId))
+  //       .then((response) => {
+  //         if (response.success) {
+  //           const subscriptionProducts = JSON.parse(
+  //             localStorage.getItem("subscriptionProducts")
+  //           );
+  //           const user_credentials = localStorage.getItem("user_credentials");
+  //           if (subscriptionProducts && subscriptionProducts.length > 0) {
+  //             return handlePaymentSubscription(
+  //               customerId,
+  //               subscriptionProducts[0].priceId,
+  //               JSON.parse(user_credentials).email,
+  //               JSON.parse(user_credentials).password
+  //             );
+  //           }
+  //         } else {
+  //           console.log("Payment Status False");
+  //         }
+  //       })
+  //       .then((response) => {
+  //         if (response) console.log(response);
+
+  //         setIsProcessing(false);
+  //         // Clear localStorage
+  //         [
+  //           "devices",
+  //           "subscriptionProducts",
+  //           "orderDetails",
+  //           "installation_details",
+  //           "user_credentials",
+  //           "agent_details",
+  //           "isUserVerified",
+  //         ].forEach((item) => localStorage.removeItem(item));
+  //       })
+  //       .catch((error) => {
+  //         setError("Something went wrong! Please Contact with Support");
+  //         setIsProcessing(false);
+  //         console.error("Error in payment process:", error);
+  //       });
+  //   }
+  // }, [sessionId]);
 
   // useEffect(() => {
   //   if (sessionId) {
