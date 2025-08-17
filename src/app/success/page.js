@@ -29,9 +29,12 @@ function Page() {
       if (typeof window === "undefined") return;
 
       const devices = JSON.parse(localStorage.getItem("devices") || "[]");
-      const user_credentials = JSON.parse(localStorage.getItem("user_credentials") || "{}");
-      const verified = JSON.parse(localStorage.getItem("isUserVerified") || "false");
- 
+      const user_credentials = JSON.parse(
+        localStorage.getItem("user_credentials") || "{}"
+      );
+      const verified = JSON.parse(
+        localStorage.getItem("isUserVerified") || "false"
+      );
 
       if (!verified) {
         router.push("/");
@@ -47,21 +50,23 @@ function Page() {
           });
         }
 
-        const session = await getSessionDetails(sessionId);
-        const customerId = session?.customer;
+        // handlePaymentStatus(sessionId)
 
-        const subscriptionProducts = JSON.parse(
-          localStorage.getItem("subscriptionProducts") || "[]"
-        );
+        // const session = await getSessionDetails(sessionId);
+        // const customerId = session?.customer;
 
-        if (subscriptionProducts.length > 0) {
-          await handlePaymentSubscription(
-            customerId,
-            subscriptionProducts[0].priceId,
-            user_credentials.email,
-            user_credentials.password
-          );
-        }
+        // const subscriptionProducts = JSON.parse(
+        //   localStorage.getItem("subscriptionProducts") || "[]"
+        // );
+
+        // if (subscriptionProducts.length > 0) {
+        //   await handlePaymentSubscription(
+        //     customerId,
+        //     subscriptionProducts[0].priceId,
+        //     user_credentials.email,
+        //     user_credentials.password
+        //   );
+        // }
 
         // Optional: clean up localStorage
         [
@@ -72,9 +77,8 @@ function Page() {
           "user_credentials",
           "agent_details",
           "isUserVerified",
-          "subscription_id"
+          "subscription_id",
         ].forEach((item) => localStorage.removeItem(item));
-
       } catch (err) {
         console.error("Error in payment process:", err);
         setError("Something went wrong! Please Contact with Support");
